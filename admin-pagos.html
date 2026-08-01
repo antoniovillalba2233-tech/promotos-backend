@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro Motos — Panel de pagos</title>
+<style>
+  :root {
+    --bg: #0F0F0F;
+    --card: #1A1A1A;
+    --border: #2E2E2E;
+    --orange: #FF6B00;
+    --gold: #FFD700;
+    --green: #4CAF50;
+    --red: #FF5252;
+    --text: #FFFFFF;
+    --muted: #999999;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 24px 16px 80px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .subtitle { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
+
+  .setup-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .setup-box label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .setup-row { display: flex; gap: 8px; }
+  input[type="text"], input[type="password"] {
+    flex: 1;
+    background: #0F0F0F;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 16px;
+  }
+  .btn-primary { background: var(--orange); color: #fff; }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-approve { background: var(--green); color: #fff; }
+  .btn-reject { background: transparent; color: var(--red); border: 1px solid var(--red); }
+
+  #status { font-size: 13px; margin-top: 8px; color: var(--muted); }
+
+  .payment-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .payment-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .payment-plan { font-weight: 700; font-size: 16px; }
+  .payment-amount { color: var(--gold); font-weight: 700; font-size: 16px; }
+  .payment-meta { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .payment-meta b { color: var(--text); font-weight: 500; }
+  .method-badge {
+    display: inline-block;
+    background: rgba(255,107,0,0.15);
+    color: var(--orange);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 60px 20px;
+    font-size: 14px;
+  }
+  .refresh-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .refresh-row h2 { font-size: 15px; margin: 0; color: var(--muted); font-weight: 600; }
+  .link-btn {
+    background: none;
+    color: var(--orange);
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏍️ Pro Motos — Panel de pagos</h1>
+  <p class="subtitle">Aprobá o rechazá los pagos manuales (CBU / AstroPay / WhatsApp)</p>
+
+  <div class="setup-box">
+    <label for="backendUrl">URL de tu backend (Railway)</label>
+    <div class="setup-row" style="margin-bottom: 10px;">
+      <input type="text" id="backendUrl" placeholder="https://promotos-backend-production.up.railway.app" value="https://promotos-backend-production.up.railway.app">
+    </div>
+    <label for="adminSecret">Clave de administrador (ADMIN_SECRET de Railway)</label>
+    <div class="setup-row">
+      <input type="password" id="adminSecret" placeholder="Pegá acá tu ADMIN_SECRET">
+      <button class="btn-primary" onclick="loadPayments()">Conectar</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="refresh-row">
+    <h2 id="countLabel">Pagos pendientes</h2>
+    <button class="link-btn" onclick="loadPayments()">↻ Actualizar</button>
+  </div>
+
+  <div id="paymentsList"></div>
+</div>
+
+<script>
+  function getBackendUrl() {
+    return document.getElementById('backendUrl').value.trim().replace(/\/$/, '');
+  }
+  function getSecret() {
+    return document.getElementById('adminSecret').value.trim();
+  }
+
+  function saveConfig() {
+    localStorage.setItem('pm_backend_url', getBackendUrl());
+    localStorage.setItem('pm_admin_secret', getSecret());
+  }
+
+  function restoreConfig() {
+    const url = localStorage.getItem('pm_backend_url');
+    const secret = localStorage.getItem('pm_admin_secret');
+    if (url) document.getElementById('backendUrl').value = url;
+    if (secret) document.getElementById('adminSecret').value = secret;
+  }
+
+  const planLabels = {
+    pack_1: '1 crédito',
+    pack_10: '10 créditos',
+    pack_25: '25 créditos',
+    full_course: 'Curso completo'
+  };
+
+  const methodLabels = {
+    cbu: 'Transferencia CBU',
+    astropay: 'AstroPay',
+    whatsapp: 'WhatsApp'
+  };
+
+  async function loadPayments() {
+    saveConfig();
+    const status = document.getElementById('status');
+    const list = document.getElementById('paymentsList');
+    status.textContent = 'Cargando...';
+    status.style.color = '#999999';
+
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/admin/payments/pending`, {
+        headers: { 'X-Admin-Secret': getSecret() }
+      });
+
+      if (res.status === 401) {
+        status.textContent = 'Clave incorrecta o falta configurar ADMIN_SECRET en Railway.';
+        status.style.color = '#FF5252';
+        list.innerHTML = '';
+        return;
+      }
+      if (!res.ok) {
+        status.textContent = `Error del servidor (HTTP ${res.status})`;
+        status.style.color = '#FF5252';
+        return;
+      }
+
+      const payments = await res.json();
+      status.textContent = `Conectado. ${payments.length} pago(s) pendiente(s).`;
+      status.style.color = '#4CAF50';
+      renderPayments(payments);
+    } catch (e) {
+      status.textContent = 'No se pudo conectar con el backend. Revisá la URL.';
+      status.style.color = '#FF5252';
+    }
+  }
+
+  function renderPayments(payments) {
+    const list = document.getElementById('paymentsList');
+    document.getElementById('countLabel').textContent = `Pagos pendientes (${payments.length})`;
+
+    if (payments.length === 0) {
+      list.innerHTML = '<div class="empty">No hay pagos pendientes por ahora.</div>';
+      return;
+    }
+
+    list.innerHTML = payments.map(p => `
+      <div class="payment-card" id="card-${p.payment_id}">
+        <span class="method-badge">${methodLabels[p.method] || p.method}</span>
+        <div class="payment-top">
+          <div class="payment-plan">${planLabels[p.plan] || p.plan}</div>
+          <div class="payment-amount">US$${p.amount_usd}</div>
+        </div>
+        <div class="payment-meta">
+          <div><b>${p.user_name || p.user_email}</b></div>
+          <div>${p.user_email}</div>
+          <div>ID: ${p.payment_id}</div>
+          ${p.transfer_reference ? `<div>Referencia: <b>${p.transfer_reference}</b></div>` : ''}
+          ${p.notes ? `<div>Notas: ${p.notes}</div>` : ''}
+        </div>
+        <div class="actions">
+          <button class="btn-approve" onclick="approvePayment('${p.payment_id}')">✓ Aprobar y acreditar</button>
+          <button class="btn-reject" onclick="rejectPayment('${p.payment_id}')">✕ Rechazar</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function approvePayment(paymentId) {
+    if (!confirm('¿Confirmás que recibiste el pago y querés acreditarlo?')) return;
+    const card = document.getElementById(`card-${paymentId}`);
+    card.style.opacity = '0.5';
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/admin/payments/${paymentId}/approve`, {
+        method: 'POST',
+        headers: { 'X-Admin-Secret': getSecret() }
+      });
+      if (res.ok) {
+        card.remove();
+      } else {
+        alert('No se pudo aprobar el pago.');
+        card.style.opacity = '1';
+      }
+    } catch (e) {
+      alert('Error de conexión.');
+      card.style.opacity = '1';
+    }
+  }
+
+  async function rejectPayment(paymentId) {
+    if (!confirm('¿Rechazar este pago? El usuario no recibirá créditos.')) return;
+    const card = document.getElementById(`card-${paymentId}`);
+    card.style.opacity = '0.5';
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/admin/payments/${paymentId}/reject`, {
+        method: 'POST',
+        headers: { 'X-Admin-Secret': getSecret() }
+      });
+      if (res.ok) {
+        card.remove();
+      } else {
+        alert('No se pudo rechazar el pago.');
+        card.style.opacity = '1';
+      }
+    } catch (e) {
+      alert('Error de conexión.');
+      card.style.opacity = '1';
+    }
+  }
+
+  restoreConfig();
+  if (getSecret()) loadPayments();
+</script>
+</body>
+</html>
