@@ -26,6 +26,14 @@ db = client[os.environ['DB_NAME']]
 # Create the main app without a prefix
 app = FastAPI()
 
+from fastapi.responses import HTMLResponse
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_panel():
+    """Panel web simple para aprobar/rechazar pagos manuales (CBU/AstroPay/WhatsApp)."""
+    html_path = ROOT_DIR / "static_admin.html"
+    return html_path.read_text(encoding="utf-8")
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
@@ -857,6 +865,18 @@ async def get_payment_status(payment_id: str, authorization: Optional[str] = Hea
 
 ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "")
 
+@api_router.get("/admin/payments/pending")
+async def admin_list_pending_payments(x_admin_secret: Optional[str] = Header(None)):
+    """Lista los pagos manuales (CBU/AstroPay/WhatsApp) pendientes de aprobar."""
+    if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    payments = await db.payments.find(
+        {"status": {"$in": ["pending", "awaiting_verification"]}, "method": {"$ne": "google_play"}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    return payments
+
 @api_router.post("/admin/payments/{payment_id}/approve")
 async def admin_approve_payment(payment_id: str, x_admin_secret: Optional[str] = Header(None)):
     """Aprobar manualmente un pago por CBU/AstroPay/WhatsApp y acreditar los
@@ -892,6 +912,22 @@ async def admin_approve_payment(payment_id: str, x_admin_secret: Optional[str] =
         {"$set": {"status": "completed", "approved_at": datetime.now(timezone.utc)}}
     )
     return {"status": "completed", "plan": plan_id}
+
+@api_router.post("/admin/payments/{payment_id}/reject")
+async def admin_reject_payment(payment_id: str, x_admin_secret: Optional[str] = Header(None)):
+    """Rechazar un pago manual (por ejemplo si el comprobante no es válido)."""
+    if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    payment = await db.payments.find_one({"payment_id": payment_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    await db.payments.update_one(
+        {"payment_id": payment_id},
+        {"$set": {"status": "rejected", "rejected_at": datetime.now(timezone.utc)}}
+    )
+    return {"status": "rejected"}
 
 @api_router.get("/payment/my-payments")
 async def get_my_payments(authorization: Optional[str] = Header(None)):
