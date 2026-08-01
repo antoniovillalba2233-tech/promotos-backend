@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Request
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -26,13 +27,11 @@ db = client[os.environ['DB_NAME']]
 # Create the main app without a prefix
 app = FastAPI()
 
-from fastapi.responses import HTMLResponse
-
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_panel():
-    """Panel web simple para aprobar/rechazar pagos manuales (CBU/AstroPay/WhatsApp)."""
-    html_path = ROOT_DIR / "static_admin.html"
-    return html_path.read_text(encoding="utf-8")
+@app.get("/admin", include_in_schema=False)
+async def serve_admin_panel():
+    """Panel de administración para aprobar pagos manuales, accesible desde
+    cualquier dispositivo en https://TU_BACKEND/admin"""
+    return FileResponse(ROOT_DIR / "admin-pagos.html")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
