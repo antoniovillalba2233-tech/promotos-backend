@@ -176,7 +176,7 @@ VIDEOS = {
     "diag_arranque_dificultoso": YT + "_aXy5OTYOq4",    # Moto no arranca: 4 causas y soluciones (verificado)
     "diag_perdida_potencia": YT + "qSdV1yHtuMk",        # Por qué mi moto pierde fuerza y potencia (verificado)
     "diag_mediciones_calibre": YT + "CEJuZ2_kXmI",      # Aprende a usar el calibrador Vernier / pie de rey (verificado)
-    "diag_rectificacion_cigenal": YT + "gm53JGY4EhY",   # Rectificado del cigüeñal de un motor (verificado)
+    "diag_rectificacion_cigenal": YT + "KNp7bUxfxP8",   # Desarme y armado de cigüeñal de moto: centrado (verificado, específico de motos)
     "diag_estado_bujia": YT + "zDb1sLSA4eM",            # Por qué la bujía de mi moto sale negra, marrón o blanca (verificado)
     "diag_seminario_no_arranca": YT + "lr8-ZSQgKR0",    # ¿Por qué no arranca mi moto? (verificado)
 
